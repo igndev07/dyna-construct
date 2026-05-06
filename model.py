@@ -62,6 +62,10 @@ def train_model():
     return model, acc, list(X.columns)
 
 def monte_carlo_simulation(model, base_input: dict, budget_cr: float, n_simulations: int = 1000):
+    # Ensure budget_cr is a float
+    budget_cr = float(budget_cr)
+    n_simulations = int(n_simulations)
+    
     noise_cfg = {
         "weather": (0, 0), "labor": (0, 15), "material_delay": (0, 0),
         "complexity": (0, 0), "progress": (0, 10), "soil_risk": (0, 0),
@@ -71,19 +75,25 @@ def monte_carlo_simulation(model, base_input: dict, budget_cr: float, n_simulati
     for _ in range(n_simulations):
         row = {}
         for feat, (mn, sd) in noise_cfg.items():
-            val = base_input[feat]
+            # Explicitly cast base value to float to avoid type errors during addition
+            val = float(base_input[feat])
             row[feat] = val + np.random.normal(mn, sd) if sd > 0 else val
         rows.append(row)
+    
     df = pd.DataFrame(rows)
     df["labor"] = df["labor"].clip(10, 100)
     df["progress"] = df["progress"].clip(0, 100)
     df["equipment"] = df["equipment"].clip(10, 100)
     df["rework_rate"] = df["rework_rate"].clip(0, 0.4)
     
+    # Predict using the XGBoost model
     delays = np.clip(model.predict(df), 0, None)
-    # Probabilistic cost impact: Base cost + (delay * 0.8% of budget daily) + random cost overruns
+    
+    # Probabilistic cost impact
+    # Base cost + (delay * 0.8% of budget daily) + random cost overruns
     costs = budget_cr + (delays * budget_cr * 0.008) + np.random.normal(0, budget_cr*0.02, n_simulations)
     
+    # Calculate percentiles
     p10, p50, p90 = np.percentile(delays, [10, 50, 90])
     cp10, cp50, cp90 = np.percentile(costs, [10, 50, 90])
     
