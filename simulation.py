@@ -73,44 +73,118 @@ def generate_recommendation(weather, labor, material_delay, complexity, predicte
     return recs, round(cost_impact, 1)
 
 
-def generate_design_variants(complexity: int, budget_cr: float, site_area_sqm: float):
+def generate_design_variants(complexity: int, budget_cr: float, site_area_sqm: float, current_progress_pct: float = 0):
     """
-    Generative design: produce 3 ranked structural layout variants.
-    Each variant trades off cost, time, and risk differently.
+    Generative design: Real Genetic Algorithm implementation.
+    If progress > 0, it switches to "Adaptive Rescue Mode" to optimize the remaining work.
     """
-    base_cost = budget_cr
-    variants = [
-        {
-            "name": "Variant A — Lean Execution",
-            "description": "Optimised for minimum cost. Sequential task scheduling, standard materials, conventional formwork.",
-            "est_cost_cr":      round(base_cost * 0.88, 2),
-            "est_duration_days": round(complexity * 42 * 0.95, 0),
-            "rework_risk":      "Medium (12%)",
-            "carbon_t":         round(site_area_sqm * 0.18, 1),
-            "score":            72,
-            "recommended":      False,
-        },
-        {
-            "name": "Variant B — Balanced Optimum ⭐",
-            "description": "AI-recommended balance of cost, time, and safety. Parallel critical path execution, prefab elements for repetitive sections.",
-            "est_cost_cr":      round(base_cost * 0.96, 2),
-            "est_duration_days": round(complexity * 42 * 0.80, 0),
-            "rework_risk":      "Low (5%)",
-            "carbon_t":         round(site_area_sqm * 0.14, 1),
-            "score":            91,
-            "recommended":      True,
-        },
-        {
-            "name": "Variant C — Speed-First",
-            "description": "Maximum speed using modular construction and 3-shift scheduling. Higher upfront cost, earliest handover.",
-            "est_cost_cr":      round(base_cost * 1.12, 2),
-            "est_duration_days": round(complexity * 42 * 0.65, 0),
-            "rework_risk":      "Low (4%)",
-            "carbon_t":         round(site_area_sqm * 0.16, 1),
-            "score":            84,
-            "recommended":      False,
-        },
-    ]
+    POP_SIZE = 20
+    GENERATIONS = 12
+    
+    # Calculate Remaining Scope
+    remaining_work_factor = 1.0 - (current_progress_pct / 100.0)
+    
+    # If we are midway, we have less flexibility (e.g. can't change method for foundation already poured)
+    is_mid_project = current_progress_pct > 10
+    
+    def random_individual():
+        return [
+            np.random.randint(0, 3),        # Method
+            np.random.randint(0, 3),        # Material
+            np.random.randint(1, 4),        # Shifts
+            np.random.randint(8, 16),       # Crew Size * 10
+            np.random.randint(0, 61)        # Prefab %
+        ]
+
+    population = [random_individual() for _ in range(POP_SIZE)]
+    
+    # Science Baseline (Bromilow's Law)
+    total_baseline_duration = round(55 * (budget_cr ** 0.35), 0)
+    remaining_baseline_duration = total_baseline_duration * remaining_work_factor
+    remaining_baseline_cost = budget_cr * remaining_work_factor
+    
+    def fitness(ind):
+        method, material, shifts, crew, prefab = ind
+        crew_mul = crew / 10.0
+        
+        # Duration for remaining work
+        duration = remaining_baseline_duration
+        if method == 1: duration *= 0.6 # Modular is 40% faster
+        elif method == 2: duration *= 0.75 # Hybrid is 25% faster
+        
+        # Rescue acceleration: Higher intensity if mid-project crisis
+        acceleration_factor = (1 + (shifts - 1) * 0.6) * crew_mul
+        duration /= acceleration_factor
+        
+        # Cost for remaining work
+        cost = remaining_baseline_cost
+        if method == 1: cost *= 1.25 # Switching to Modular midway is very expensive
+        elif method == 2: cost *= 1.12 # Hybrid switch is moderately expensive
+        
+        cost += (shifts - 1) * (remaining_baseline_cost * 0.06) # Shift premium
+        cost *= (1 + (crew_mul - 1) * 0.5)
+        
+        # Carbon for remaining work
+        carbon_base = (site_area_sqm * 0.15) * (remaining_baseline_cost / 100.0)
+        if method == 1: carbon = carbon_base * 0.7 # Modular: -30% Carbon
+        elif method == 2: carbon = carbon_base * 0.85 # Hybrid: -15% Carbon
+        else: carbon = carbon_base # Traditional
+        
+        # Risk (Mid-project changes increase risk)
+        risk = 0.14 if is_mid_project else 0.08
+        if method == 1: risk *= 0.6 # Modular reduces site errors
+        elif method == 2: risk *= 1.1 # Hybrid is complex to manage midway
+        
+        # Score calculation
+        cost_ratio = cost / max(remaining_baseline_cost, 0.1)
+        dur_ratio = duration / max(remaining_baseline_duration, 0.1)
+        
+        score = 100 - (max(0, cost_ratio-0.9)*100) - (max(0, dur_ratio-0.7)*50) - (risk*40)
+        return score, cost, duration, risk, carbon
+        
+    for gen in range(GENERATIONS):
+        scored_pop = [(ind, fitness(ind)) for ind in population]
+        scored_pop.sort(key=lambda x: x[1][0], reverse=True)
+        survivors = [x[0] for x in scored_pop[:POP_SIZE//2]]
+        
+        new_pop = list(survivors)
+        while len(new_pop) < POP_SIZE:
+            p1, p2 = np.random.choice(len(survivors), 2, replace=False)
+            child = list(survivors[p1])
+            cp = np.random.randint(1, 4)
+            child[cp:] = survivors[p2][cp:]
+            if np.random.rand() < 0.2:
+                mut_idx = np.random.randint(0, 5)
+                child[mut_idx] = random_individual()[mut_idx]
+            new_pop.append(child)
+        population = new_pop
+        
+    final_scored = [(ind, fitness(ind)) for ind in population]
+    final_scored.sort(key=lambda x: x[1][0], reverse=True)
+    
+    variants = []
+    seen_methods = set()
+    for ind, (score, cost, duration, risk, carbon) in final_scored:
+        method = ind[0]
+        if method not in seen_methods:
+            seen_methods.add(method)
+            method_name = ["Traditional", "Modular", "Hybrid"][method]
+            prefix = "Rescue Strategy" if is_mid_project else "Design Variant"
+            
+            variants.append({
+                "name": f"{prefix} — {method_name}",
+                "description": f"Optimized recovery using {ind[2]} shift(s) and {ind[4]}% pre-fab for the remaining {int(remaining_work_factor*100)}% work.",
+                "est_cost_cr": round(cost, 2),
+                "est_duration_days": round(duration, 0),
+                "rework_risk": f"{round(risk*100, 1)}%",
+                "carbon_t": round(carbon, 1),
+                "score": int(np.clip(score, 0, 100)),
+                "recommended": False
+            })
+            if len(variants) == 3: break
+                
+    if variants:
+        variants[0]["recommended"] = True
     return variants
 
 
