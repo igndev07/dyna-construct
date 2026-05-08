@@ -276,9 +276,9 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 💰 Project Parameters")
-    budget_cr    = st.number_input("Budget (₹ Crore)", min_value=10.0, max_value=10000.0, value=500.0, step=10.0,
+    budget_cr    = st.number_input("Budget (₹ Crore)", min_value=10.0, max_value=100000.0, value=500.0, step=10.0,
                                    help="The total estimated cost of the project. This helps the AI calculate the standard timeline for projects of this scale.")
-    site_area    = st.number_input("Site Area (sqm)", min_value=500, max_value=500000, value=25000, step=500,
+    site_area    = st.number_input("Site Area (sqm)", min_value=500, max_value=5000000, value=25000, step=500,
                                    help="The physical size of your construction site. Larger areas increase logistical complexity and the overall carbon footprint.")
     project_name = st.text_input("Project Name", value="L&T Infrastructure Project Alpha")
 
