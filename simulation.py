@@ -234,12 +234,43 @@ def simulate_iot_tick(prev_state: dict) -> dict:
     def drift(val, lo, hi, sigma):
         return float(np.clip(val + np.random.normal(0, sigma), lo, hi))
 
-    concrete_strength = drift(prev_state.get("concrete_strength", 28.0), 20, 45, 0.4)
-    ambient_temp      = drift(prev_state.get("ambient_temp", 32.0), 15, 48, 0.6)
-    humidity          = drift(prev_state.get("humidity", 65.0), 30, 95, 1.0)
-    structural_load   = drift(prev_state.get("structural_load", 72.0), 40, 110, 1.5)
-    dust_ppm          = drift(prev_state.get("dust_ppm", 180.0), 50, 500, 8.0)
-    vibration_mmps    = drift(prev_state.get("vibration_mmps", 3.2), 0, 15, 0.3)
+    SPIKE_CHANCE = 0.10  # ~1 in 10 readings hits the danger zone
+
+    # Concrete Strength: alert < 22, so spike DOWN
+    if np.random.random() < SPIKE_CHANCE:
+        concrete_strength = drift(np.random.uniform(18.0, 21.5), 15, 30, 0.2)
+    else:
+        concrete_strength = drift(prev_state.get("concrete_strength", 28.0), 20, 30, 0.4)
+
+    # Ambient Temp: alert > 43, so spike UP
+    if np.random.random() < SPIKE_CHANCE:
+        ambient_temp = drift(np.random.uniform(43.5, 47.0), 15, 48, 0.3)
+    else:
+        ambient_temp = drift(prev_state.get("ambient_temp", 32.0), 15, 48, 0.6)
+
+    # Humidity: alert > 88, so spike UP
+    if np.random.random() < SPIKE_CHANCE:
+        humidity = drift(np.random.uniform(89.0, 94.0), 30, 95, 0.5)
+    else:
+        humidity = drift(prev_state.get("humidity", 65.0), 30, 95, 1.0)
+
+    # Structural Load: alert > 100, so spike UP
+    if np.random.random() < SPIKE_CHANCE:
+        structural_load = drift(np.random.uniform(101.0, 109.0), 40, 110, 0.5)
+    else:
+        structural_load = drift(prev_state.get("structural_load", 72.0), 40, 110, 1.5)
+
+    # Dust PPM: alert > 400, so spike UP
+    if np.random.random() < SPIKE_CHANCE:
+        dust_ppm = drift(np.random.uniform(410.0, 490.0), 50, 500, 3.0)
+    else:
+        dust_ppm = drift(prev_state.get("dust_ppm", 180.0), 50, 500, 8.0)
+
+    # Vibration: alert > 12, so spike UP
+    if np.random.random() < SPIKE_CHANCE:
+        vibration_mmps = drift(np.random.uniform(12.5, 14.5), 0, 15, 0.2)
+    else:
+        vibration_mmps = drift(prev_state.get("vibration_mmps", 3.2), 0, 15, 0.3)
 
     # Anomaly flags
     alerts = []

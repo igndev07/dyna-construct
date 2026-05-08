@@ -642,14 +642,48 @@ with tab2:
     st.plotly_chart(fig_gantt, use_container_width=True)
     st.info(f"🔴 **Critical Path:** {' → '.join(critical)}")
 
+    # Calculate baseline tasks to compare for "Saved" days
+    _, _, baseline_tasks, _ = compute_critical_path(predicted_delay, c_map[complexity], budget_cr, speed_multiplier=1.0)
+
     slack_rows = []
     for task in tasks:
         n = G.nodes[task]
-        slack_rows.append({"Task":task, "Duration":f"{n['duration']}d",
-                            "ES":f"Day {n['ES']:.0f}", "EF":f"Day {n['EF']:.0f}",
-                            "Slack":f"{n['slack']:.1f}d",
-                            "Critical":"🔴 YES" if task in critical else "🟢 No"})
-    st.dataframe(pd.DataFrame(slack_rows), use_container_width=True, hide_index=True)
+        # Calculate reduction if any
+        base_dur = baseline_tasks[task]["duration"]
+        reduction = base_dur - n['duration']
+        
+        row = {
+            "Task": task, 
+            "Duration": f"{n['duration']:.1f}d",
+            "ES": f"Day {n['ES']:.0f}", 
+            "EF": f"Day {n['EF']:.0f}",
+            "Slack": f"{n['slack']:.1f}d",
+            "Critical": "🔴 YES" if task in critical else "🟢 No"
+        }
+        
+        if sync_ai and reduction > 0.1:
+            row["⚡ Days Reduced"] = f"-{reduction:.1f}d"
+        
+        slack_rows.append(row)
+    
+    df_slack = pd.DataFrame(slack_rows)
+    
+    # Eye-catching styling for the reduction column
+    if "⚡ Days Reduced" in df_slack.columns:
+        # Reorder to put Reduced column right after Duration for visibility
+        cols = list(df_slack.columns)
+        if "⚡ Days Reduced" in cols:
+            cols.insert(cols.index("Duration") + 1, cols.pop(cols.index("⚡ Days Reduced")))
+            df_slack = df_slack[cols]
+            
+        st.dataframe(
+            df_slack.style.apply(lambda x: ['background-color: rgba(16, 185, 129, 0.2); color: #10B981; font-weight: bold' 
+                                          if x.name == '⚡ Days Reduced' else '' for _ in x], axis=0),
+            use_container_width=True, 
+            hide_index=True
+        )
+    else:
+        st.dataframe(df_slack, use_container_width=True, hide_index=True)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 3 — GENERATIVE DESIGN
@@ -847,6 +881,13 @@ with tab4:
         if not task_delays: task_delays["Foundation Work"] = 5 # Default if alert but no exact match
         
         G_rec, crit_rec, tasks_rec, rec_duration = compute_critical_path(predicted_delay, c_map[complexity], budget_cr, task_delays=task_delays, speed_multiplier=speed_mult)
+        
+        # 🎯 AREA AFFECTED IDENTIFICATION
+        st.markdown('<div style="background:rgba(239,68,68,0.1); border:1px solid #EF4444; border-radius:12px; padding:1rem; margin-bottom:1.5rem;">', unsafe_allow_html=True)
+        st.markdown('<div style="color:#EF4444; font-weight:700; margin-bottom:0.5rem;">🚨 AFFECTED AREAS DETECTED:</div>', unsafe_allow_html=True)
+        for task, extra in task_delays.items():
+             st.markdown(f"• **{task}**: +{extra} days delay (Recalibrated from sensors)")
+        st.markdown('</div>', unsafe_allow_html=True)
         
         delay_delta = rec_duration - base_duration
         cost_delta = delay_delta * budget_cr * 0.008
