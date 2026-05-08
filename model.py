@@ -3,18 +3,21 @@ import pandas as pd
 from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
+from sklearn.model_selection import cross_val_score
+import shap
 import networkx as nx
 
-def generate_synthetic_data(n=2000):
+def generate_synthetic_data(n=10000):
     np.random.seed(42)
-    weather     = np.random.randint(0, 3, n)
-    labor       = np.random.randint(20, 100, n)
-    mat_delay   = np.random.randint(0, 2, n)
+    # Calibrated probabilities based on research
+    weather     = np.random.choice([0, 1, 2], p=[0.50, 0.33, 0.17], size=n) # Mumbai climate
+    labor       = np.clip(np.random.normal(68, 18, n), 10, 100) # Right-skewed reality
+    mat_delay   = np.random.choice([0, 1], p=[0.55, 0.45], size=n) # MoSPI 2023: 44.5% projects delayed
     complexity  = np.random.randint(1, 4, n)
     progress    = np.random.randint(5, 95, n)
-    soil_risk   = np.random.randint(0, 3, n)
-    equipment   = np.random.randint(40, 100, n)
-    rework_rate = np.random.uniform(0, 0.25, n)
+    soil_risk   = np.random.choice([0, 1, 2], p=[0.60, 0.30, 0.10], size=n)
+    equipment   = np.clip(np.random.normal(75, 20, n), 20, 100) # L&T target 85%, reality 72-78%
+    rework_rate = np.clip(np.random.beta(2, 12, n), 0, 0.30) # KPMG: avg 12-18%, long tail
 
     # Nonlinear interactions (e.g., Rainy + Low Labor = Exponential Delay)
     interaction_term = (weather == 1).astype(int) * (100 - labor) * 0.25
@@ -59,7 +62,14 @@ def train_model():
     
     model.fit(X_tr, y_tr)
     acc = r2_score(y_te, model.predict(X_te))
-    return model, acc, list(X.columns)
+    
+    # Calculate 5-fold cross-validation scores
+    cv_scores = cross_val_score(model, X, y, cv=5, scoring='r2')
+    
+    # Create SHAP explainer
+    explainer = shap.TreeExplainer(model)
+    
+    return model, acc, list(X.columns), explainer, cv_scores
 
 def monte_carlo_simulation(model, base_input: dict, budget_cr: float, n_simulations: int = 1000):
     # Ensure budget_cr is a float

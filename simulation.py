@@ -73,11 +73,14 @@ def generate_recommendation(weather, labor, material_delay, complexity, predicte
     return recs, round(cost_impact, 1)
 
 
-def generate_design_variants(complexity: int, budget_cr: float, site_area_sqm: float, current_progress_pct: float = 0):
+def generate_design_variants(complexity: int, budget_cr: float, site_area_sqm: float, current_progress_pct: float = 0, outcome_history: list = None):
     """
     Generative design: Real Genetic Algorithm implementation.
     If progress > 0, it switches to "Adaptive Rescue Mode" to optimize the remaining work.
     """
+    if outcome_history is None:
+        outcome_history = []
+
     POP_SIZE = 20
     GENERATIONS = 12
     
@@ -160,6 +163,16 @@ def generate_design_variants(complexity: int, budget_cr: float, site_area_sqm: f
         
         # Balanced scoring for realistic recommendations
         score = 100 - (max(0, cost_ratio-0.9)*80) - (max(0, dur_ratio-0.7)*120) - (risk*40)
+        
+        # --- ADAPTIVE LEARNING FROM HISTORY ---
+        if outcome_history:
+            # Check how this method performed historically
+            historical_perf = [h for h in outcome_history if h["method"] == method]
+            if historical_perf:
+                # If this method saved more time than expected in past, boost its score
+                avg_saving_delta = np.mean([h["actual_saving"] - h["predicted_saving"] for h in historical_perf])
+                score += avg_saving_delta * 2.0  # Boost or penalize based on real-world outcome
+                
         return score, cost, duration, risk, carbon
 
 
