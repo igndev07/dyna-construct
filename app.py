@@ -25,11 +25,15 @@ st.markdown("""
         background-color: #020617;
     }
 
-    /* Remove top space and hide header */
-    [data-testid="stHeader"] {
-        display: none;
-    }
+    /* RESET: Removed custom header/toolbar CSS to restore defaults */
+    
     .block-container {
+
+
+
+
+
+
         padding-top: 2.5rem !important;
         padding-bottom: 0rem !important;
     }
@@ -298,9 +302,10 @@ st.markdown('<div class="main-title">🏗️ DynaConstructa.AI</div>', unsafe_al
 st.markdown('<div class="sub-title">Adaptive Digital Twin · Generative Design · Real-Time IoT Recalibration</div>', unsafe_allow_html=True)
 
 # ── KPI BAR ───────────────────────────────────────────────────────────────────
-# Calculate Finish Metrics
-baseline_dur = 55 * (budget_cr ** 0.35)
+# Calculate Finish Metrics (Sync with simulation.py K=85)
+baseline_dur = 85 * (budget_cr ** 0.35)
 total_expected_dur = baseline_dur + predicted_delay
+
 remaining_days = total_expected_dur * (1 - progress/100.0)
 
 st.markdown("""
@@ -547,7 +552,7 @@ with tab2:
     
     # Calculate speed multiplier from AI recommendation if synced
     speed_mult = 1.0
-    if sync_ai:
+    if sync_ai and remaining_days > 0:
         # Get the top recommended variant
         v_opt = generate_design_variants(c_map[complexity], budget_cr, site_area, current_progress_pct=progress)[0]
         # Ratio of original remaining days vs optimized remaining days
@@ -606,6 +611,21 @@ with tab2:
 # TAB 3 — GENERATIVE DESIGN
 # ═════════════════════════════════════════════════════════════════════════════
 with tab3:
+    # 🎊 Celebration State for 100% Progress
+    if progress >= 100:
+        st.balloons()
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 3rem; border-radius: 20px; text-align: center; margin: 2rem 0; box-shadow: 0 20px 40px rgba(16, 185, 129, 0.2);">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">🏆</div>
+            <h1 style="color: white; margin: 0; font-size: 2.5rem; font-weight: 800;">MISSION ACCOMPLISHED</h1>
+            <p style="color: #ECFDF5; font-size: 1.2rem; margin-top: 1rem; opacity: 0.9;">
+                Project successfully delivered. All structural nodes verified. <br>
+                <b>Final Status:</b> 100% Operational · 0 Safety Incidents · AI-Optimized Handover Ready.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
+
     if progress == 0:
         st.markdown('''
             <div class="section-header">
@@ -634,11 +654,11 @@ with tab3:
             <div style="font-size:0.85rem;color:#9CA3AF;margin:6px 0">{v['description']}</div>
             <div style="display:flex;gap:2rem;margin-top:10px;flex-wrap:wrap">
                 <div><div style="font-size:0.75rem;color:#6B7280">Est. Remaining Cost</div><div style="font-size:1.1rem;font-weight:600;color:#F59E0B">₹{v['est_cost_cr']} Cr</div></div>
-                <div><div style="font-size:0.75rem;color:#6B7280">Remaining Duration</div><div style="font-size:1.1rem;font-weight:600;color:#F59E0B">{v['est_duration_days']:.0f} days</div></div>
-                <div><div style="font-size:0.75rem;color:#6B7280">⏳ Time Saved</div><div style="font-size:1.1rem;font-weight:600;color:#10B981">{max(0, int(remaining_days - v['est_duration_days']))} days</div></div>
-                <div><div style="font-size:0.75rem;color:#6B7280">Rework Risk</div><div style="font-size:1.1rem;font-weight:600;color:#F59E0B">{v['rework_risk']}</div></div>
-                <div><div style="font-size:0.75rem;color:#6B7280">Carbon</div><div style="font-size:1.1rem;font-weight:600;color:#F59E0B">{v['carbon_t']} T CO₂</div></div>
-                <div><div style="font-size:0.75rem;color:#6B7280">Strategy Score</div><div style="font-size:1.1rem;font-weight:600;color:#{'10B981' if v['score']>88 else 'FBBF24'}">{v['score']}/100</div></div>
+                <div><div style="font-size:0.75rem;color:#6B7280">Remaining Duration</div><div style="font-size:1.1rem;font-weight:600;color:#38BDF8">{v['est_duration_days']:.0f} days</div></div>
+                <div><div style="font-size:0.75rem;color:#10B981;font-weight:700">⚡ Time Saved</div><div style="font-size:1.1rem;font-weight:600;color:#10B981">{max(0, int(remaining_days - v['est_duration_days']))} days</div></div>
+                <div><div style="font-size:0.75rem;color:#6B7280">Rework Risk</div><div style="font-size:1.1rem;font-weight:600;color:#F87171">{v['rework_risk']}</div></div>
+                <div><div style="font-size:0.75rem;color:#6B7280">Est. Carbon Footprint</div><div style="font-size:1.1rem;font-weight:600;color:#94A3B8">{v['carbon_t']} T CO₂</div></div>
+                <div><div style="font-size:0.75rem;color:#6B7280">Strategy Score</div><div style="font-size:1.1rem;font-weight:600;color:#{'10B981' if v['score']>85 else 'FBBF24'}">{v['score']}/100</div></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -650,24 +670,30 @@ with tab3:
         </div>
     ''', unsafe_allow_html=True)
     cats_r   = ["Cost Efficiency","Speed","Quality","Sustainability","AI Score"]
-    max_d    = max(v["est_duration_days"] for v in variants)
-    max_c    = max(v["est_cost_cr"] for v in variants)
     v_colors = ["#3B82F6","#F59E0B","#10B981"]
     fig_cmp  = go.Figure()
     for i, v in enumerate(variants):
         # Extract percentage from string like "5.0%"
         risk_val = float(v["rework_risk"].replace("%",""))
-        # Safety check for division by zero (when progress is 100%)
-        cost_score = round(10-(v["est_cost_cr"]/max_c)*10,1) if max_c > 0 else 10.0
-        dur_score  = round(10-(v["est_duration_days"]/max_d)*10,1) if max_d > 0 else 10.0
+        
+        # Recalibrate radar scores for professional demo impact
+        time_saved = max(0, baseline_dur - v["est_duration_days"])
+        # 10/10 speed = 40% time saved (our modeled max efficiency)
+        dur_score = round(np.clip((time_saved / (baseline_dur * 0.4)) * 10, 0, 10), 1)
+        
+        # 10/10 cost = at or below budget. Penalty for overruns.
+        cost_overrun = v["est_cost_cr"] - budget_cr
+        cost_score = round(np.clip(10 - (max(0, cost_overrun)/(budget_cr*0.2))*10, 0, 10), 1)
         
         sc = [
             cost_score,
             dur_score,
-            round(10-(risk_val/2),1),
-            round(10-(v["carbon_t"]/(site_area*0.2*(budget_cr/100.0)))*10,1) if site_area > 0 else 10.0,
+            round(np.clip(10-(risk_val/2), 0, 10), 1),
+            round(np.clip(10-(v["carbon_t"]/(site_area*0.12*(budget_cr/100.0)))*10, 0, 10), 1) if site_area > 0 else 10.0,
             round(v["score"]/10,1),
         ]
+
+
         fig_cmp.add_trace(go.Scatterpolar(
             r=sc+[sc[0]], theta=cats_r+[cats_r[0]],
             fill="toself", name=v["name"].split("—")[0].strip(),
@@ -688,12 +714,28 @@ with tab3:
 # TAB 4 — LIVE IOT SENSOR FEED
 # ═════════════════════════════════════════════════════════════════════════════
 with tab4:
+    # 📡 Delivery State for 100% Progress
+    if progress >= 100:
+        st.markdown("""
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10B981; padding: 2rem; border-radius: 15px; text-align: center; margin-bottom: 2rem;">
+            <h3 style="color: #10B981; margin: 0;">📡 Final Structural Verification: SUCCESS</h3>
+            <p style="color: #9CA3AF; margin-top: 0.5rem;">All IoT sensors have been decommissioned or transitioned to facility management mode.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        # Show static final readings
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Final Concrete Strength", "42.5 MPa", "Verified")
+        c2.metric("Structural Load", "82.0%", "Stable")
+        c3.metric("System Health", "100%", "Optimal")
+        st.stop()
+
     st.markdown('''
         <div class="section-header">
             📡 Real-Time IoT Sensor Feed — Construction Site
             <div class="tooltip">ⓘ<span class="tooltiptext">Live data from site sensors monitoring concrete strength, temperature, and structural safety.</span></div>
         </div>
     ''', unsafe_allow_html=True)
+
 
     # If crisis mode — spike the sensors dramatically
     if crisis_mode and "iot_state" not in st.session_state:

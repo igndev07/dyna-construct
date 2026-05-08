@@ -99,48 +99,73 @@ def generate_design_variants(complexity: int, budget_cr: float, site_area_sqm: f
     population = [random_individual() for _ in range(POP_SIZE)]
     
     # Science Baseline (Bromilow's Law)
-    total_baseline_duration = round(55 * (budget_cr ** 0.35), 0)
+    # Industry Baseline (Bromilow's Law - Re-calibrated for realism)
+    # K=85 reflects complex infrastructure projects (L&T scale)
+    total_baseline_duration = round(85 * (budget_cr ** 0.35), 0)
     remaining_baseline_duration = total_baseline_duration * remaining_work_factor
     remaining_baseline_cost = budget_cr * remaining_work_factor
     
     def fitness(ind):
         method, material, shifts, crew, prefab = ind
         crew_mul = crew / 10.0
-        
-        # Duration for remaining work
+
+        # Constrain prefab % based on method
+        if method == 0: prefab = np.clip(prefab, 0, 10) # Traditional
+        elif method == 1: prefab = np.clip(prefab, 60, 95) # Modular
+        elif method == 2: prefab = np.clip(prefab, 20, 55) # Hybrid
+
+        # Duration for remaining work - DIMINISHING RETURNS MODEL
+        # Adding more people/shifts doesn't scale linearly (Brooks' Law)
         duration = remaining_baseline_duration
-        if method == 1: duration *= 0.6 # Modular is 40% faster
-        elif method == 2: duration *= 0.75 # Hybrid is 25% faster
         
-        # Rescue acceleration: Higher intensity if mid-project crisis
-        acceleration_factor = (1 + (shifts - 1) * 0.6) * crew_mul
-        duration /= acceleration_factor
+        # Method efficiency (Realistic: Modular is 25-30% faster)
+        method_mul = 1.0
+        if method == 1: method_mul = 0.72 # Modular
+        elif method == 2: method_mul = 0.85 # Hybrid
+        
+        # Shift & Crew efficiency with saturation effect
+        # sqrt() or log() models the diminishing returns of adding resources
+        resource_boost = (np.sqrt(shifts) * 0.2) + (np.sqrt(crew_mul) * 0.15)
+        
+        # Final realistic duration calculation
+        duration = (duration * method_mul) / (1 + resource_boost)
+        
+        # Hard cap: AI cannot magically save more than 40% time on remaining work
+        min_feasible_duration = remaining_baseline_duration * 0.60
+        duration = max(duration, min_feasible_duration)
         
         # Cost for remaining work
         cost = remaining_baseline_cost
-        if method == 1: cost *= 1.25 # Switching to Modular midway is very expensive
-        elif method == 2: cost *= 1.12 # Hybrid switch is moderately expensive
+        if method == 1: cost *= 1.18 # Modular switch premium
+        elif method == 2: cost *= 1.08 
         
-        cost += (shifts - 1) * (remaining_baseline_cost * 0.06) # Shift premium
-        cost *= (1 + (crew_mul - 1) * 0.5)
+        # Resource premiums
+        cost += (shifts - 1) * (remaining_baseline_cost * 0.08) 
+        cost *= (1 + (crew_mul - 1) * 0.6)
         
         # Carbon for remaining work
-        carbon_base = (site_area_sqm * 0.15) * (remaining_baseline_cost / 100.0)
-        if method == 1: carbon = carbon_base * 0.7 # Modular: -30% Carbon
-        elif method == 2: carbon = carbon_base * 0.85 # Hybrid: -15% Carbon
-        else: carbon = carbon_base # Traditional
+        carbon_base = (site_area_sqm * 0.12) * (remaining_baseline_cost / 100.0)
+        if method == 1: carbon = carbon_base * 0.75 # Modular: -25% Carbon
+        elif method == 2: carbon = carbon_base * 0.88 # Hybrid: -12% Carbon
+        else: carbon = carbon_base 
         
         # Risk (Mid-project changes increase risk)
-        risk = 0.14 if is_mid_project else 0.08
-        if method == 1: risk *= 0.6 # Modular reduces site errors
-        elif method == 2: risk *= 1.1 # Hybrid is complex to manage midway
+        risk = 0.12 if is_mid_project else 0.07
+        if method == 1: risk *= 0.75 
+        elif method == 2: risk *= 1.10 
         
-        # Score calculation
+        # Score calculation: REALISTIC BALANCE
         cost_ratio = cost / max(remaining_baseline_cost, 0.1)
         dur_ratio = duration / max(remaining_baseline_duration, 0.1)
         
-        score = 100 - (max(0, cost_ratio-0.9)*100) - (max(0, dur_ratio-0.7)*50) - (risk*40)
+        # Balanced scoring for realistic recommendations
+        score = 100 - (max(0, cost_ratio-0.9)*80) - (max(0, dur_ratio-0.7)*120) - (risk*40)
         return score, cost, duration, risk, carbon
+
+
+
+
+
         
     for gen in range(GENERATIONS):
         scored_pop = [(ind, fitness(ind)) for ind in population]

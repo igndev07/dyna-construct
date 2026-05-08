@@ -111,8 +111,9 @@ def monte_carlo_simulation(model, base_input: dict, budget_cr: float, n_simulati
 
 def compute_critical_path(predicted_delay: float, complexity: int, budget_cr: float, task_delays: dict = None, speed_multiplier: float = 1.0):
     # --- SYNCHRONIZED SCIENCE: BROMILOW'S LAW ---
-    # We use the same baseline as the Generative Engine for consistency.
-    target_duration = (55 * (budget_cr ** 0.35)) / speed_multiplier
+    # Sync with app.py and simulation.py (K=85 for L&T scale)
+    target_duration = (85 * (budget_cr ** 0.35)) / speed_multiplier
+
     
     # Scaling factor for individual tasks (Base tasks sum to approx 60 units)
     scale = (target_duration / 60.0)
