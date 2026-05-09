@@ -1016,9 +1016,62 @@ with tab5:
             </div>
         ''', unsafe_allow_html=True)
         
-        # Use the generated image
-        image_path = r"C:\Users\amank\.gemini\antigravity\brain\749443ad-57a5-4a35-bc9c-676cf7ad6085\construction_site_wide_shot_1778322758707.png"
-        st.image(image_path, use_container_width=True, caption="Site Camera #04-B: West Elevation")
+        # Generate a synthetic construction site camera feed (platform-independent)
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
+        import matplotlib.patheffects as pe
+        import io
+        
+        fig_cam, ax = plt.subplots(figsize=(8, 4))
+        fig_cam.patch.set_facecolor('#0a0f1e')
+        ax.set_facecolor('#0a0f1e')
+        ax.set_xlim(0, 100); ax.set_ylim(0, 50)
+        ax.axis('off')
+        
+        # Sky gradient simulation
+        for i in range(50):
+            alpha = 0.05 + i * 0.005
+            ax.axhspan(i, i+1, color='#1a2a4a', alpha=min(alpha, 0.6))
+        
+        # Ground
+        ax.add_patch(patches.Rectangle((0, 0), 100, 8, color='#2d2d2d'))
+        
+        # Building structure (progress-aware)
+        n_floors = 12
+        built = max(1, int((progress / 100.0) * n_floors))
+        for f in range(n_floors):
+            col = '#38BDF8' if f < built else '#1e3a5f'
+            alpha = 0.9 if f < built else 0.3
+            ax.add_patch(patches.Rectangle((20, 8 + f*3.2), 50, 2.8, color=col, alpha=alpha, linewidth=0.5, edgecolor='#0f2744'))
+            for col_x in [20, 32, 44, 56, 68]:
+                ax.add_patch(patches.Rectangle((col_x, 8 + f*3.2), 1.5, 3.2, color='#1e90ff' if f < built else '#1e3a5f', alpha=alpha))
+        
+        # Crane
+        ax.plot([75, 75], [8, 48], color='#F59E0B', linewidth=3)
+        ax.plot([75, 92], [48, 48], color='#F59E0B', linewidth=2)
+        ax.plot([75, 65], [48, 48], color='#F59E0B', linewidth=2)
+        ax.plot([92, 93], [48, 30], color='#F59E0B', linewidth=1, linestyle='--', alpha=0.7)
+        
+        # Camera overlay UI elements
+        ax.add_patch(patches.Rectangle((0, 0), 100, 50, fill=False, edgecolor='#38BDF8', linewidth=2, alpha=0.4))
+        ax.add_patch(patches.Rectangle((1, 46), 35, 3.5, color='#0B0F19', alpha=0.8))
+        ax.text(2, 47.5, f'📷 CAM #04-B  |  LIVE  |  Floor: {built}/{n_floors}  |  Progress: {progress}%', 
+                color='#38BDF8', fontsize=5.5, fontfamily='monospace')
+        
+        # Corner crosshairs
+        for cx, cy in [(5,5),(5,45),(95,5),(95,45)]:
+            ax.plot([cx-3, cx-1], [cy, cy], color='#38BDF8', lw=1, alpha=0.7)
+            ax.plot([cx, cy-1 if cx==5 else cy+1], [cy, cy], color='#38BDF8', lw=1, alpha=0)
+            ax.plot([cx, cx], [cy-1, cy+1], color='#38BDF8', lw=1, alpha=0.7)
+        
+        ax.text(50, 1.5, 'West Elevation  |  DynaConstructa.AI Vision Twin', 
+                color='#94A3B8', fontsize=5, ha='center', fontfamily='monospace')
+
+        buf = io.BytesIO()
+        fig_cam.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0f1e')
+        buf.seek(0)
+        plt.close(fig_cam)
+        st.image(buf, use_container_width=True, caption="Site Camera #04-B: West Elevation — AI Vision Twin Feed")
         
         # CNN Results
         detections = run_cnn_inference(progress=progress)
