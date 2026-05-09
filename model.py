@@ -6,8 +6,11 @@ from sklearn.metrics import r2_score
 from sklearn.model_selection import cross_val_score
 import shap
 import networkx as nx
+import streamlit as st
 
+@st.cache_data
 def generate_synthetic_data(n=10000):
+
     np.random.seed(42)
     # Calibrated probabilities based on research
     weather     = np.random.choice([0, 1, 2], p=[0.50, 0.33, 0.17], size=n) # Mumbai climate
@@ -42,7 +45,9 @@ def generate_synthetic_data(n=10000):
         "delay_days": np.clip(delay_days, 0, None)
     })
 
+@st.cache_resource
 def train_model():
+
     data = generate_synthetic_data()
     X = data.drop("delay_days", axis=1)
     y = data["delay_days"]
@@ -71,7 +76,9 @@ def train_model():
     
     return model, acc, list(X.columns), explainer, cv_scores
 
-def monte_carlo_simulation(model, base_input: dict, budget_cr: float, n_simulations: int = 1000):
+@st.cache_data
+def monte_carlo_simulation(_model, base_input: dict, budget_cr: float, n_simulations: int = 1000):
+
     # Ensure budget_cr is a float
     budget_cr = float(budget_cr)
     n_simulations = int(n_simulations)
@@ -97,7 +104,7 @@ def monte_carlo_simulation(model, base_input: dict, budget_cr: float, n_simulati
     df["rework_rate"] = df["rework_rate"].clip(0, 0.4)
     
     # Predict using the XGBoost model
-    delays = np.clip(model.predict(df), 0, None)
+    delays = np.clip(_model.predict(df), 0, None)
     
     # Probabilistic cost impact
     # Base cost + (delay * 0.8% of budget daily) + random cost overruns

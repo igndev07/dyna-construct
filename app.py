@@ -363,44 +363,82 @@ st.markdown(
 )
 st.markdown("---")
 
-# ── TABS ──────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "📊 Command Centre",
-    "🎲 Monte Carlo & CPM",
-    "🧬 Generative Design",
-    "📡 Live IoT Sensor Feed",
-    "🛰️ BIM & Vision Twin",
-    "🔬 AI Science & Provenance",
-    "🌍 Supply Chain & ESG",
-    "⚡ Autonomous Execution",
-])
-
-# ── CSS FOR HORIZONTAL TABS (PREMIUM SCROLL) ──
+# ── PREMIUM TABS ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
+    /* Hide the default Streamlit tab bar styling but keep the structure */
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+    .stTabs [data-baseweb="tab-border"] {
+        display: none !important;
+    }
+    
+    /* Premium Tab List Container */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
-        flex-wrap: nowrap !important;
-        scrollbar-width: thin;
-        scrollbar-color: #38BDF8 #020617;
+        gap: 12px !important;
+        background: rgba(15, 23, 42, 0.4) !important;
+        padding: 10px 16px !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(56, 189, 248, 0.1) !important;
+        margin-bottom: 30px !important;
+        overflow-x: auto !important;
+        scrollbar-width: none !important;
     }
-    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
-        height: 4px;
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+
+    /* Individual Tab Buttons */
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(30, 41, 59, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 10px !important;
+        padding: 8px 18px !important;
+        height: auto !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        color: #94A3B8 !important;
     }
-    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-thumb {
-        background: #38BDF8;
-        border-radius: 10px;
+
+    /* Active Tab State */
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(56, 189, 248, 0.05) 100%) !important;
+        border-color: rgba(56, 189, 248, 0.5) !important;
+        color: #38BDF8 !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 0 10px rgba(56, 189, 248, 0.1) !important;
+        transform: translateY(-2px) !important;
+    }
+
+    /* Hover State */
+    .stTabs [data-baseweb="tab"]:hover {
+        background: rgba(56, 189, 248, 0.1) !important;
+        border-color: rgba(56, 189, 248, 0.3) !important;
+        color: #F8FAFC !important;
+        transform: translateY(-1px) !important;
     }
 </style>
 """, unsafe_allow_html=True)
+
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "📊 Command Centre",
+    "🎲 Monte Carlo",
+    "🧬 Gen. Design",
+    "📡 IoT Sensors",
+    "🛰️ BIM Twin",
+    "🔬 AI Science",
+    "🌍 Supply & ESG",
+    "⚡ Execution",
+])
+
+
+
+
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 1 — COMMAND CENTRE
 # ═════════════════════════════════════════════════════════════════════════════
 with tab1:
+
+
     left, right = st.columns([1.3, 1])
 
     with left:
@@ -572,6 +610,8 @@ with tab1:
 # TAB 2 — MONTE CARLO & CPM
 # ═════════════════════════════════════════════════════════════════════════════
 with tab2:
+
+
     st.markdown('''
         <div class="section-header">
             🎲 Monte Carlo Simulation (1,000 Scenarios)
@@ -726,6 +766,8 @@ with tab2:
 # TAB 3 — GENERATIVE DESIGN
 # ═════════════════════════════════════════════════════════════════════════════
 with tab3:
+
+
     # 🎊 Celebration State for 100% Progress
     if progress >= 100:
         st.balloons()
@@ -829,6 +871,8 @@ with tab3:
 # TAB 4 — LIVE IOT SENSOR FEED
 # ═════════════════════════════════════════════════════════════════════════════
 with tab4:
+
+
     # 📡 Delivery State for 100% Progress
     if progress >= 100:
         st.markdown("""
@@ -1006,6 +1050,8 @@ with tab4:
 # TAB 5 — BIM & VISION TWIN
 # ═════════════════════════════════════════════════════════════════════════════
 with tab5:
+
+
     v_left, v_right = st.columns([1, 1])
 
     with v_left:
@@ -1040,11 +1086,13 @@ with tab5:
         n_floors = 12
         built = max(1, int((progress / 100.0) * n_floors))
         for f in range(n_floors):
-            col = '#38BDF8' if f < built else '#1e3a5f'
+            fc = '#38BDF8' if f < built else '#1e3a5f'
             alpha = 0.9 if f < built else 0.3
-            ax.add_patch(patches.Rectangle((20, 8 + f*3.2), 50, 2.8, color=col, alpha=alpha, linewidth=0.5, edgecolor='#0f2744'))
+            # Use facecolor + edgecolor separately to avoid matplotlib override warning
+            ax.add_patch(patches.Rectangle((20, 8 + f*3.2), 50, 2.8, facecolor=fc, edgecolor='#0f2744', alpha=alpha, linewidth=0.5))
             for col_x in [20, 32, 44, 56, 68]:
-                ax.add_patch(patches.Rectangle((col_x, 8 + f*3.2), 1.5, 3.2, color='#1e90ff' if f < built else '#1e3a5f', alpha=alpha))
+                col_fc = '#1e90ff' if f < built else '#1e3a5f'
+                ax.add_patch(patches.Rectangle((col_x, 8 + f*3.2), 1.5, 3.2, facecolor=col_fc, edgecolor='none', alpha=alpha))
         
         # Crane
         ax.plot([75, 75], [8, 48], color='#F59E0B', linewidth=3)
@@ -1054,8 +1102,9 @@ with tab5:
         
         # Camera overlay UI elements
         ax.add_patch(patches.Rectangle((0, 0), 100, 50, fill=False, edgecolor='#38BDF8', linewidth=2, alpha=0.4))
-        ax.add_patch(patches.Rectangle((1, 46), 35, 3.5, color='#0B0F19', alpha=0.8))
-        ax.text(2, 47.5, f'📷 CAM #04-B  |  LIVE  |  Floor: {built}/{n_floors}  |  Progress: {progress}%', 
+        ax.add_patch(patches.Rectangle((1, 46), 35, 3.5, facecolor='#0B0F19', edgecolor='none', alpha=0.8))
+        # Use ASCII text only — emoji glyphs are not in DejaVu Sans Mono
+        ax.text(2, 47.5, f'[CAM #04-B]  LIVE  |  Floor: {built}/{n_floors}  |  Progress: {progress}%',
                 color='#38BDF8', fontsize=5.5, fontfamily='monospace')
         
         # Corner crosshairs
@@ -1134,6 +1183,8 @@ with tab5:
         st.info(f"📍 **Digital Twin Status:** Building Structure at {progress}% Verification Level.")
 
 with tab6:
+
+
     st.markdown('''
         <div class="section-header">
             📚 Data Provenance & Research Calibration
@@ -1244,6 +1295,8 @@ with tab6:
 # TAB 7 — SUPPLY CHAIN & ESG CONTROL TOWER
 # ═════════════════════════════════════════════════════════════════════════════
 with tab7:
+
+
     sc_left, sc_right = st.columns([1.2, 1])
 
     with sc_left:
@@ -1277,11 +1330,26 @@ with tab7:
         site_lat, site_lon = CITY_COORDS.get(city, (19.0760, 72.8777))
         hubs = SUPPLIER_HUBS.get(city, SUPPLIER_HUBS["Mumbai"])
 
+        # City-specific SECONDARY inland hubs for AI rerouting (guaranteed not in sea)
+        SECONDARY_HUBS = {
+            "Mumbai":    ("Raigarh Steel Depot",      18.3162, 73.1812),
+            "Delhi":     ("Sonipat Steel Yard",       28.9931, 77.0151),
+            "Bangalore": ("Tumkur Steel Hub",         13.3379, 77.1173),
+            "Chennai":   ("Ranipet Steel Works",      12.9256, 79.3333),
+            "Hyderabad": ("Medak Industrial Hub",     17.9124, 78.1413),
+            "Pune":      ("Satara Steel Hub",         17.6805, 74.0183),
+            "Ahmedabad": ("Mehsana Steel Yard",       23.5880, 72.3693),
+            "Kolkata":   ("Kharagpur Steel Depot",    22.3460, 87.2320),
+            "Surat":     ("Ankleshwar Steel Hub",     21.6267, 72.9994),
+            "Jaipur":    ("Alwar Steel Depot",        27.5530, 76.6346),
+        }
+
         # Dynamic Rerouting Logic
         active_hubs = list(hubs)
         rerouted = False
+        secondary_hub_name = SECONDARY_HUBS.get(city, ("Secondary Hub", hubs[0][1]+0.3, hubs[0][2]+0.3))
         if mat_delay == "Yes" and sync_ai:
-            active_hubs[0] = ("Secondary Steel Hub (Rerouted)", hubs[0][1] + 0.5, hubs[0][2] + 0.5)
+            active_hubs[0] = (f"{secondary_hub_name[0]} (Rerouted)", secondary_hub_name[1], secondary_hub_name[2])
             rerouted = True
 
         lats = [site_lat, active_hubs[0][1], active_hubs[1][1], active_hubs[2][1]]
@@ -1364,9 +1432,11 @@ with tab7:
 
         
         if mat_delay == "Yes" and not sync_ai:
-            st.error("🚨 **SUPPLY CHAIN ALERT:** Primary steel shipment from Pune is delayed. Critical path at risk. **Turn on 'Sync AI Strategy' to resolve.**")
+            primary_hub = hubs[0][0]
+            st.error(f"🚨 **SUPPLY CHAIN ALERT:** Primary steel shipment from **{primary_hub}** is delayed. Critical path at risk. **Turn on 'Sync AI Strategy' to resolve.**")
         elif mat_delay == "Yes" and sync_ai:
-            st.warning("🔄 **AI ACTION TAKEN:** Order rerouted to secondary supplier in Nashik. Schedule integrity maintained.")
+            sec = SECONDARY_HUBS.get(city, ("Secondary Hub",0,0))
+            st.warning(f"🔄 **AI ACTION TAKEN:** Order rerouted from {hubs[0][0]} → **{sec[0]}**. New ETA recalculated. Schedule integrity maintained.")
         else:
             st.success("✅ **SUPPLY CHAIN STATUS:** All JIT deliveries arriving on schedule.")
 
@@ -1434,6 +1504,8 @@ with tab7:
 # TAB 8 — AUTONOMOUS EXECUTION ENGINE
 # ═════════════════════════════════════════════════════════════════════════════
 with tab8:
+
+
     st.markdown('''
         <div class="section-header">
             ⚡ Autonomous Action Execution Log
