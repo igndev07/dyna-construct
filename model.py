@@ -185,3 +185,30 @@ def compute_critical_path(predicted_delay: float, complexity: int, budget_cr: fl
         
     critical = [n for n in G.nodes if G.nodes[n].get("slack", 1) <= 0.01 and n not in ("START", "END")]
     return G, critical, base_tasks, round(project_duration, 1)
+
+def run_cnn_inference(image_path: str = None, progress: int = 0):
+    """
+    Mock Computer Vision / Reality Capture engine.
+    Compares real-time site photos against the 4D BIM schedule.
+    """
+    # Base structural detections
+    detections = [
+        {"label": "As-Built vs BIM Match", "value": f"{min(98, progress + np.random.randint(2, 8))}%", "status": "VERIFIED", "color": "#10B981"},
+        {"label": "Volumetric Concrete Placed", "value": f"{int(progress * 120)} m³", "status": "ON TRACK", "color": "#3B82F6"},
+    ]
+    
+    if progress < 15:
+        detections.append({"label": "Autonomous Drone Survey", "value": "LiDAR Scan 100%", "status": "COMPLETED", "color": "#38BDF8"})
+    else:
+        detections.append({"label": "Worker Density (Zone A)", "value": "24 Personnel", "status": "OPTIMAL", "color": "#10B981"})
+
+    
+    # Introduce dynamic "clashes" or "variances" based on progress to show why AI is needed
+    if progress > 10 and progress < 80:
+        detections.append({"label": "Rebar Spacing Variance", "value": "12mm deviation", "status": "WARNING", "color": "#F59E0B"})
+        detections.append({"label": "Schedule Delta (Visual)", "value": "-3 Days", "status": "BEHIND", "color": "#EF4444"})
+    elif progress >= 80:
+        detections.append({"label": "MEP Clash Detected", "value": "HVAC vs Plumb", "status": "RESOLVED by AI", "color": "#38BDF8"})
+        
+    return detections
+

@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import plotly.figure_factory as ff
 import streamlit as st
 
-from model import train_model, monte_carlo_simulation, compute_critical_path
+from model import train_model, monte_carlo_simulation, compute_critical_path, run_cnn_inference
 from simulation import generate_recommendation, generate_design_variants, simulate_iot_tick, compute_financials
 from weather import fetch_weather, CITY_COORDS
 
@@ -322,6 +322,14 @@ total_expected_dur = baseline_dur + predicted_delay
 
 remaining_days = total_expected_dur * (1 - progress/100.0)
 
+# Calculate speed multiplier from AI recommendation if synced
+speed_mult = 1.0
+if sync_ai and remaining_days > 0:
+    # Get the top recommended variant
+    v_opt = generate_design_variants(c_map[complexity], budget_cr, site_area, current_progress_pct=progress, outcome_history=st.session_state.get("outcome_history"))[0]
+    # Ratio of original remaining days vs optimized remaining days
+    speed_mult = remaining_days / max(1.0, v_opt['est_duration_days'])
+
 st.markdown("""
     <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
         <div class="metric-card" style="flex: 1; border-left: 4px solid #EF4444;">
@@ -356,13 +364,38 @@ st.markdown(
 st.markdown("---")
 
 # ── TABS ──────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📊 Command Centre",
     "🎲 Monte Carlo & CPM",
     "🧬 Generative Design",
     "📡 Live IoT Sensor Feed",
+    "🛰️ BIM & Vision Twin",
     "🔬 AI Science & Provenance",
+    "🌍 Supply Chain & ESG",
+    "⚡ Autonomous Execution",
 ])
+
+# ── CSS FOR HORIZONTAL TABS (PREMIUM SCROLL) ──
+st.markdown("""
+<style>
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        flex-wrap: nowrap !important;
+        scrollbar-width: thin;
+        scrollbar-color: #38BDF8 #020617;
+    }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {
+        height: 4px;
+    }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar-thumb {
+        background: #38BDF8;
+        border-radius: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 1 — COMMAND CENTRE
@@ -594,13 +627,7 @@ with tab2:
         </div>
     ''', unsafe_allow_html=True)
     
-    # Calculate speed multiplier from AI recommendation if synced
-    speed_mult = 1.0
-    if sync_ai and remaining_days > 0:
-        # Get the top recommended variant
-        v_opt = generate_design_variants(c_map[complexity], budget_cr, site_area, current_progress_pct=progress, outcome_history=st.session_state.get("outcome_history"))[0]
-        # Ratio of original remaining days vs optimized remaining days
-        speed_mult = remaining_days / max(1.0, v_opt['est_duration_days'])
+    # Using global speed_mult calculated above
 
     G, critical, tasks, proj_duration = compute_critical_path(predicted_delay, c_map[complexity], budget_cr, speed_multiplier=speed_mult)
 
@@ -646,6 +673,10 @@ with tab2:
     _, _, baseline_tasks, _ = compute_critical_path(predicted_delay, c_map[complexity], budget_cr, speed_multiplier=1.0)
 
     slack_rows = []
+    action_plan = {}
+    if sync_ai and 'v_opt' in locals():
+        action_plan = v_opt.get("action_plan", {})
+        
     for task in tasks:
         n = G.nodes[task]
         # Calculate reduction if any
@@ -663,6 +694,9 @@ with tab2:
         
         if sync_ai and reduction > 0.1:
             row["⚡ Days Reduced"] = f"-{reduction:.1f}d"
+            # Add prescriptive action
+            action = action_plan.get(task, "AI optimized resource scheduling")
+            row["🛠️ AI Action Taken"] = action
         
         slack_rows.append(row)
     
@@ -670,11 +704,14 @@ with tab2:
     
     # Eye-catching styling for the reduction column
     if "⚡ Days Reduced" in df_slack.columns:
-        # Reorder to put Reduced column right after Duration for visibility
+        # Reorder columns for visibility
         cols = list(df_slack.columns)
         if "⚡ Days Reduced" in cols:
             cols.insert(cols.index("Duration") + 1, cols.pop(cols.index("⚡ Days Reduced")))
-            df_slack = df_slack[cols]
+        if "🛠️ AI Action Taken" in cols:
+            cols.insert(cols.index("⚡ Days Reduced") + 1, cols.pop(cols.index("🛠️ AI Action Taken")))
+            
+        df_slack = df_slack[cols]
             
         st.dataframe(
             df_slack.style.apply(lambda x: ['background-color: rgba(16, 185, 129, 0.2); color: #10B981; font-weight: bold' 
@@ -965,7 +1002,85 @@ with tab4:
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 5 — AI SCIENCE & PROVENANCE
 # ═════════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 5 — BIM & VISION TWIN
+# ═════════════════════════════════════════════════════════════════════════════
 with tab5:
+    v_left, v_right = st.columns([1, 1])
+
+    with v_left:
+        st.markdown('''
+            <div class="section-header">
+                📸 Reality Capture Engine
+                <div class="tooltip">ⓘ<span class="tooltiptext">Advanced Computer Vision system continuously compares drone/camera feeds against the BIM schedule to detect visual delays before they show up in paperwork.</span></div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        # Use the generated image
+        image_path = r"C:\Users\amank\.gemini\antigravity\brain\749443ad-57a5-4a35-bc9c-676cf7ad6085\construction_site_wide_shot_1778322758707.png"
+        st.image(image_path, use_container_width=True, caption="Site Camera #04-B: West Elevation")
+        
+        # CNN Results
+        detections = run_cnn_inference(progress=progress)
+        st.markdown("### 👁️ As-Built vs BIM Verification")
+        st.caption("How do we know the schedule is slipping? The AI literally 'sees' it.")
+        for d in detections:
+            st.markdown(f"""
+            <div style="display:flex; justify-content:space-between; background:rgba(30,41,59,0.4); padding:8px 12px; border-radius:8px; margin-bottom:6px; border-left:4px solid {d['color']};">
+                <span style="color:#F8FAFC; font-weight:600;">{d['label']}</span>
+                <span style="color:#94A3B8;">{d['value']}</span>
+                <span style="color:{d['color']}; font-weight:700;">{d['status']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with v_right:
+        st.markdown('''
+            <div class="section-header">
+                🏗️ 4D Generative BIM Twin
+                <div class="tooltip">ⓘ<span class="tooltiptext">Not just a static model. When the AI recommends a 'Modular Switch' or a 'Design Pivot', this Digital Twin updates automatically to reflect the new structure.</span></div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        # Create a 3D Building Skeleton in Plotly
+        # progress determines how many floors are "built"
+        n_floors = 10
+        built_floors = int((progress / 100.0) * n_floors)
+        
+        fig_bim = go.Figure()
+        
+        # Draw columns and slabs for each floor
+        for f in range(n_floors):
+            is_built = f < built_floors
+            color = "#38BDF8" if is_built else "#334155"
+            opacity = 0.8 if is_built else 0.2
+            
+            # Floor Slab
+            x = [0, 10, 10, 0, 0]
+            y = [0, 0, 10, 10, 0]
+            z = [f*3, f*3, f*3, f*3, f*3]
+            fig_bim.add_trace(go.Scatter3d(x=x, y=y, z=z, mode='lines', line=dict(color=color, width=4), opacity=opacity, showlegend=False))
+            
+            # Columns (at 4 corners)
+            if f < n_floors - 1:
+                for cx, cy in [(0,0), (10,0), (10,10), (0,10)]:
+                    fig_bim.add_trace(go.Scatter3d(x=[cx, cx], y=[cy, cy], z=[f*3, (f+1)*3], mode='lines', line=dict(color=color, width=4), opacity=opacity, showlegend=False))
+
+        fig_bim.update_layout(
+            scene=dict(
+                xaxis=dict(visible=False),
+                yaxis=dict(visible=False),
+                zaxis=dict(title="Floors", backgroundcolor="rgba(0,0,0,0)"),
+                bgcolor="#0B0F19"
+            ),
+            paper_bgcolor="#0B0F19",
+            margin=dict(l=0, r=0, b=0, t=0),
+            height=450
+        )
+        st.plotly_chart(fig_bim, use_container_width=True)
+        
+        st.info(f"📍 **Digital Twin Status:** Building Structure at {progress}% Verification Level.")
+
+with tab6:
     st.markdown('''
         <div class="section-header">
             📚 Data Provenance & Research Calibration
@@ -1071,6 +1186,280 @@ with tab5:
     </div>
     """, unsafe_allow_html=True)
     st.info("The simulation runs on Gaussian drift for demonstration. The production architecture shown above is designed to ingest live MQTT payloads from industry-standard hardware.")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 7 — SUPPLY CHAIN & ESG CONTROL TOWER
+# ═════════════════════════════════════════════════════════════════════════════
+with tab7:
+    sc_left, sc_right = st.columns([1.2, 1])
+
+    with sc_left:
+        st.markdown('''
+            <div class="section-header">
+                🌍 Global Logistics & JIT Supply Chain
+                <div class="tooltip">ⓘ<span class="tooltiptext">Real-time geospatial tracking of materials. AI dynamically reroutes shipments to prevent schedule delays.</span></div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        # Determine status based on sidebar inputs
+        delay_status = "CRITICAL DELAY" if mat_delay == "Yes" else "ON TIME"
+        route_color = "#EF4444" if mat_delay == "Yes" and not sync_ai else "#10B981"
+        if mat_delay == "Yes" and sync_ai:
+            delay_status = "REROUTED BY AI"
+            route_color = "#F59E0B"
+            
+        # Realistic Regional Supply Chain Hubs for Indian Cities
+        SUPPLIER_HUBS = {
+            "Mumbai": [("Pune Steel Hub", 18.5204, 73.8567), ("Nashik Silos", 19.9975, 73.7898), ("Surat Precast", 21.1702, 72.8311)],
+            "Delhi": [("Panipat Steel", 29.3909, 76.9635), ("Alwar Cement", 27.5530, 76.6346), ("Ghaziabad Precast", 28.6692, 77.4538)],
+            "Bangalore": [("Salem Steel", 11.6643, 78.1460), ("Mysore Cement", 12.2958, 76.6394), ("Hosur Precast", 12.7409, 77.8253)],
+            "Chennai": [("Sriperumbudur Steel", 12.9675, 79.9466), ("Ariyalur Cement", 11.1401, 79.0786), ("Tiruvallur Precast", 13.1438, 79.9071)],
+            "Hyderabad": [("Bolarum Steel", 17.5186, 78.5036), ("Nalgonda Cement", 17.0500, 79.2700), ("Patancheru Precast", 17.5287, 78.2667)],
+            "Pune": [("Mumbai Port Steel", 18.9667, 72.8333), ("Solapur Cement", 17.6599, 75.9064), ("Chakan Precast", 18.7500, 73.8500)],
+            "Ahmedabad": [("Hazira Steel", 21.1235, 72.6375), ("Ambuja Nagar", 20.8167, 70.8333), ("Sanand Precast", 22.9833, 72.3833)],
+            "Kolkata": [("Durgapur Steel", 23.5204, 87.3119), ("Asansol Cement", 23.6739, 86.9524), ("Haldia Precast", 22.0625, 88.0673)],
+            "Surat": [("Hazira Steel", 21.1235, 72.6375), ("Bharuch Cement", 21.7051, 72.9959), ("Navsari Precast", 20.9467, 72.9520)],
+            "Jaipur": [("Bhiwadi Steel", 28.2104, 76.8407), ("Beawar Cement", 26.1039, 74.3160), ("Ajmer Precast", 26.4499, 74.6399)],
+        }
+        site_lat, site_lon = CITY_COORDS.get(city, (19.0760, 72.8777))
+        hubs = SUPPLIER_HUBS.get(city, SUPPLIER_HUBS["Mumbai"])
+
+        # Dynamic Rerouting Logic
+        active_hubs = list(hubs)
+        rerouted = False
+        if mat_delay == "Yes" and sync_ai:
+            active_hubs[0] = ("Secondary Steel Hub (Rerouted)", hubs[0][1] + 0.5, hubs[0][2] + 0.5)
+            rerouted = True
+
+        lats = [site_lat, active_hubs[0][1], active_hubs[1][1], active_hubs[2][1]]
+        lons = [site_lon, active_hubs[0][2], active_hubs[1][2], active_hubs[2][2]]
+        names = [f"Project Site ({city})", active_hubs[0][0], active_hubs[1][0], active_hubs[2][0]]
+
+        # --- LEGEND ---
+        st.markdown("""
+        <div style="display:flex; gap:20px; margin-bottom:15px; background:rgba(30,41,59,0.5); padding:10px; border-radius:8px; border:1px solid rgba(56,189,248,0.2);">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:12px; height:12px; border-radius:50%; background:#38BDF8;"></div>
+                <span style="color:#F9FAFB; font-size:0.8rem;">Project Site</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:12px; height:12px; border-radius:50%; background:#F9FAFB;"></div>
+                <span style="color:#F9FAFB; font-size:0.8rem;">Industrial Hub</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:20px; height:2px; background:#10B981;"></div>
+                <span style="color:#F9FAFB; font-size:0.8rem;">Healthy Route</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:20px; height:2px; background:#EF4444;"></div>
+                <span style="color:#F9FAFB; font-size:0.8rem;">Delayed Route</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        fig_map = go.Figure()
+        
+        # Add Nodes
+        fig_map.add_trace(go.Scattermap(
+            lat=lats, lon=lons, mode='markers+text',
+            marker=go.scattermap.Marker(size=[20, 12, 12, 12], color=["#38BDF8", "#F9FAFB", "#F9FAFB", "#F9FAFB"]),
+            text=names, textposition="bottom right",
+            textfont=dict(color="white", size=12),
+            name="Facilities"
+        ))
+        
+        # Add Routes
+        for i in range(1, 4):
+            line_color = route_color if i == 1 else "#334155"
+            line_width = 2
+            
+            if rerouted and i == 1: 
+                line_color = "#10B981" # Rerouted to green
+                line_width = 4         # Thicker line for "AI Optimized Path"
+            
+            fig_map.add_trace(go.Scattermap(
+                lat=[lats[0], lats[i]], lon=[lons[0], lons[i]],
+                mode='lines', line=dict(width=line_width, color=line_color),
+                name=f"Route to {names[i]}"
+            ))
+            
+            # Add a truck/shipment marker on the route
+            progress_ratio = (progress % 100) / 100.0 if i != 1 else (0.2 if delay_status == "CRITICAL DELAY" and not sync_ai else 0.8)
+            t_lat = lats[i] + (lats[0] - lats[i]) * progress_ratio
+            t_lon = lons[i] + (lons[0] - lons[i]) * progress_ratio
+            fig_map.add_trace(go.Scattermap(
+                lat=[t_lat], lon=[t_lon], mode='markers',
+                marker=go.scattermap.Marker(size=12, color=line_color),
+                hoverinfo="text", hovertext=f"Shipment Status: {delay_status if i==1 and not sync_ai else 'ON TIME'}",
+                showlegend=False
+            ))
+
+        fig_map.update_layout(
+            margin={"r":0,"t":0,"l":0,"b":0},
+            map=dict(
+                style="carto-darkmatter",
+                zoom=5.8, # Closer zoom for more detail
+                center=dict(lat=site_lat + 0.5, lon=site_lon + 0.5), # Offset center to show context
+            ),
+            paper_bgcolor="#0B0F19",
+            height=450, showlegend=False
+        )
+        st.plotly_chart(fig_map, use_container_width=True)
+        
+        # Add spacing to prevent Mapbox attribution overlap
+        st.write("") 
+
+        
+        if mat_delay == "Yes" and not sync_ai:
+            st.error("🚨 **SUPPLY CHAIN ALERT:** Primary steel shipment from Pune is delayed. Critical path at risk. **Turn on 'Sync AI Strategy' to resolve.**")
+        elif mat_delay == "Yes" and sync_ai:
+            st.warning("🔄 **AI ACTION TAKEN:** Order rerouted to secondary supplier in Nashik. Schedule integrity maintained.")
+        else:
+            st.success("✅ **SUPPLY CHAIN STATUS:** All JIT deliveries arriving on schedule.")
+
+    with sc_right:
+        st.markdown('''
+            <div class="section-header">
+                🌱 ESG & Carbon Intelligence
+                <div class="tooltip">ⓘ<span class="tooltiptext">Monitors and optimizes the project's carbon footprint. L&T's commitment to Net-Zero starts here.</span></div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        # Calculate Carbon Baseline vs Optimized
+        # We must account for progress: savings only apply to the remaining work
+        rem_factor = 1.0 - (progress / 100.0)
+        baseline_carbon_total = (site_area * 0.12) * (budget_cr / 100.0)
+        baseline_carbon_remaining = baseline_carbon_total * rem_factor
+        
+        current_carbon_remaining = baseline_carbon_remaining
+        
+        if sync_ai:
+            v_opt = generate_design_variants(c_map[complexity], budget_cr, site_area, current_progress_pct=progress)[0]
+            current_carbon_remaining = v_opt["carbon_t"]
+            
+        carbon_saved = baseline_carbon_remaining - current_carbon_remaining
+        # Total projected carbon for the whole project lifecycle
+        total_projected_carbon = (baseline_carbon_total * (1.0 - rem_factor)) + current_carbon_remaining
+
+        
+        # Gauge Chart for Carbon
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number+delta",
+            value = total_projected_carbon,
+            title = {'text': "Projected Total Carbon (Tons CO₂)", 'font': {'size': 16, 'color': '#F9FAFB'}},
+            delta = {'reference': baseline_carbon_total, 'increasing': {'color': '#EF4444'}, 'decreasing': {'color': '#10B981'}},
+            gauge = {
+                'axis': {'range': [None, baseline_carbon_total * 1.2], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                'bar': {'color': "#10B981" if carbon_saved > 0 else "#38BDF8"},
+                'bgcolor': "rgba(255,255,255,0.05)",
+                'borderwidth': 0,
+                'steps': [
+                    {'range': [0, baseline_carbon_total], 'color': "rgba(16, 185, 129, 0.1)"},
+                    {'range': [baseline_carbon_total, baseline_carbon_total * 1.5], 'color': "rgba(239, 68, 68, 0.1)"}],
+                'threshold': {
+                    'line': {'color': "red", 'width': 2},
+                    'thickness': 0.75,
+                    'value': baseline_carbon_total}
+            }
+        ))
+        fig_gauge.update_layout(paper_bgcolor="#0B0F19", font=dict(color="#F9FAFB"), height=250, margin=dict(t=40,b=10))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+        
+        st.markdown(f"""
+        <div style="background:rgba(16, 185, 129, 0.1); border:1px solid #10B981; border-radius:12px; padding:15px;">
+            <div style="color:#10B981; font-weight:700; font-size:0.9rem; margin-bottom:5px;">🌿 SUSTAINABILITY IMPACT</div>
+            <div style="font-size:2rem; font-weight:800; color:#F8FAFC; line-height:1;">{carbon_saved:,.0f} <span style="font-size:1rem; color:#94A3B8; font-weight:400;">Tons CO₂ Saved</span></div>
+            <div style="color:#94A3B8; font-size:0.8rem; margin-top:8px;">
+                Equivalent to removing <b>{int(carbon_saved * 0.22)} passenger vehicles</b> from the road for a year. 
+                Achieved via generative material optimization and waste reduction.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 8 — AUTONOMOUS EXECUTION ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+with tab8:
+    st.markdown('''
+        <div class="section-header">
+            ⚡ Autonomous Action Execution Log
+            <div class="tooltip">ⓘ<span class="tooltiptext">Watch the AI Agent communicate with external APIs (ERP systems, Robotics, Drones) to physically execute the strategy.</span></div>
+        </div>
+    ''', unsafe_allow_html=True)
+    
+    st.markdown("<p style='color:#94A3B8; margin-bottom:20px;'>DynaConstructa doesn't just predict delays—it fixes them. Below is the live terminal log of the AI Agent dispatching commands to external hardware and enterprise software to execute the generative strategy.</p>", unsafe_allow_html=True)
+    
+    if not sync_ai:
+        st.warning("⚠️ **Autonomous Agent Offline.** Enable 'Sync AI Strategy' in the sidebar to authorize the AI to deploy fixes.")
+    else:
+        # Get the specific actions from the AI
+        action_plan = {}
+        if 'v_opt' in locals():
+            action_plan = v_opt.get("action_plan", {})
+            
+        import datetime
+        now = datetime.datetime.now()
+        
+        terminal_html = f"""<section style="width:100%;"><div style="background-color:#0B0F19; border:1px solid #1E293B; border-radius:10px; overflow:hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); margin-bottom:15px; width:100%; box-sizing:border-box;">
+<div style="background-color:#1E293B; padding:8px 15px; display:flex; align-items:center;">
+<div style="width:12px; height:12px; border-radius:50%; background-color:#EF4444; margin-right:8px;"></div>
+<div style="width:12px; height:12px; border-radius:50%; background-color:#F59E0B; margin-right:8px;"></div>
+<div style="width:12px; height:12px; border-radius:50%; background-color:#10B981; margin-right:15px;"></div>
+<div style="color:#94A3B8; font-family:monospace; font-size:0.8rem;">root@dynaconstructa-agent: ~/execution_node</div>
+</div>
+<div style="padding:15px; font-family:'Courier New', monospace; font-size:0.85rem; line-height:1.6; max-height:500px; overflow-y:auto; color:#E2E8F0; width:100%; box-sizing:border-box;">"""
+        
+        def add_log(tag_color, tag_name, message, status_color, status_text, latency, t_offset):
+            t = (now + datetime.timedelta(milliseconds=t_offset)).strftime("%H:%M:%S.%f")[:-3]
+            return f"""<div style="display:grid; grid-template-columns: 100px 120px 1fr 100px; gap:10px; border-bottom:1px solid rgba(30,41,59,0.5); padding:8px 0; align-items:center; width:100%; box-sizing:border-box;">
+<div style="color:#64748B; font-size:0.75rem;">[{t}]</div>
+<div style="color:{tag_color}; font-weight:bold; font-size:0.75rem;">[{tag_name}]</div>
+<div style="font-size:0.8rem; line-height:1.3; overflow:hidden; word-break:break-word;">{message}</div>
+<div style="color:{status_color}; text-align:right; font-size:0.75rem; white-space:nowrap;">{status_text} <span style="color:#64748B; font-size:0.65rem;">({latency}ms)</span></div>
+</div>"""
+
+        t_off = 0
+        terminal_html += add_log("#38BDF8", "SYSTEM", "Initiating Autonomous Execution Protocol...", "#38BDF8", "OK", 12, t_off)
+        t_off += 45
+        terminal_html += add_log("#38BDF8", "SYSTEM", "Establishing secure handshakes with L&T SAP ERP, Boston Dynamics API, and DJI Fleet Manager...", "#38BDF8", "OK", 89, t_off)
+        t_off += 120
+        terminal_html += add_log("#10B981", "SUCCESS", f"Handshakes verified. Executing {len(action_plan)} critical directives.", "#10B981", "READY", 4, t_off)
+        t_off += 50
+        
+        for task, action in action_plan.items():
+            t_off += int(np.random.randint(100, 800))
+            lat1 = int(np.random.randint(20, 150))
+            lat2 = int(np.random.randint(30, 300))
+            
+            if "LiDAR" in action or "Drone" in action:
+                terminal_html += add_log("#F59E0B", "AGENT_DISPATCH", f"Task: {task} -> Sending payload to DJI Matrix Fleet...", "#94A3B8", "Sent", lat1, t_off)
+                t_off += lat1 + 10
+                terminal_html += add_log("#10B981", "EXECUTED", f"{action}", "#10B981", "In-Air", lat2, t_off)
+            elif "JIT" in action or "Procurement" in task:
+                terminal_html += add_log("#F59E0B", "API_CALL", f"Task: {task} -> POST /api/v2/sap_erp/logistics/reroute", "#94A3B8", "Sent", lat1, t_off)
+                t_off += lat1 + 10
+                terminal_html += add_log("#10B981", "EXECUTED", f"{action}", "#10B981", "PO #99812", lat2, t_off)
+            elif "robot" in action.lower() or "autonomous" in action.lower():
+                terminal_html += add_log("#F59E0B", "ROBOTICS_CMD", f"Task: {task} -> Uploading BIM trajectory to Boston Dynamics Spot...", "#94A3B8", "Sent", lat1, t_off)
+                t_off += lat1 + 10
+                terminal_html += add_log("#10B981", "EXECUTED", f"{action}", "#10B981", "Uploaded", lat2, t_off)
+            elif "Concrete" in task:
+                terminal_html += add_log("#F59E0B", "IOT_CMD", f"Task: {task} -> Modifying sensor polling frequency to 1Hz...", "#94A3B8", "Sent", lat1, t_off)
+                t_off += lat1 + 10
+                terminal_html += add_log("#10B981", "EXECUTED", f"{action}", "#10B981", "Calibrated", lat2, t_off)
+            else:
+                terminal_html += add_log("#F59E0B", "WORK_ORDER", f"Task: {task} -> Generating digital work order for site manager...", "#94A3B8", "Sent", lat1, t_off)
+                t_off += lat1 + 10
+                terminal_html += add_log("#10B981", "EXECUTED", f"{action}", "#10B981", "Delivered", lat2, t_off)
+                
+        t_off += 50
+        terminal_html += add_log("#38BDF8", "SYSTEM", "All directives successfully dispatched. Continuous monitoring active.", "#38BDF8", "IDLE", 2, t_off)
+        
+        terminal_html += "</div></div></section>"
+        st.markdown(terminal_html, unsafe_allow_html=True)
+        
+        st.success("✅ **Execution Complete.** Physical interventions are underway.")
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown("---")
